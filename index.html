@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>不規則動詞活用クイズ</title>
+    <style>
+        :root {
+            --primary: #4a90e2;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --bg: #f5f7fa;
+            --card-bg: #ffffff;
+            --text: #333;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        h1 { margin-bottom: 1.5rem; font-size: 1.5rem; color: var(--primary); }
+        h2 { margin-bottom: 1rem; font-size: 1.25rem; }
+
+        .hidden { display: none !important; }
+
+        /* Inputs & Buttons */
+        input[type="number"], input[type="text"] {
+            padding: 10px;
+            font-size: 1rem;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            width: 80%;
+            margin-bottom: 1rem;
+            outline: none;
+        }
+        input[type="text"]:focus, input[type="number"]:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin: 5px;
+        }
+        button:hover { background-color: #357abd; }
+        button.secondary { background-color: #95a5a6; }
+        button.secondary:hover { background-color: #7f8c8d; }
+        button.danger { background-color: var(--danger); }
+        button.danger:hover { background-color: #c0392b; }
+
+        /* Quiz Specifics */
+        .question-box {
+            margin-bottom: 20px;
+        }
+        .jp-meaning {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .target-form {
+            display: inline-block;
+            background: #e1ecf4;
+            color: var(--primary);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .feedback.correct { background-color: #d4edda; color: #155724; }
+        .feedback.wrong { background-color: #f8d7da; color: #721c24; }
+
+        .progress {
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .result-score {
+            font-size: 3rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="app">
+        <!-- Home Screen -->
+        <div id="home-screen">
+            <h1>不規則動詞 活用</h1>
+            <p>動詞（A-B-B, A-B-C, A-A-A, A-B-A型）から出題します。</p>
+            <div style="margin: 20px 0;">
+                <label>出題数 (最大 <span id="max-questions"></span>問): </label><br>
+                <input type="number" id="question-count" min="1" value="10">
+            </div>
+            <button onclick="startQuiz(false)">スタート</button>
+        </div>
+
+        <!-- Quiz Screen -->
+        <div id="quiz-screen" class="hidden">
+            <div class="question-box">
+                <span class="target-form" id="q-type">過去形</span>
+                <span class="jp-meaning" id="q-word">食べる</span>
+                <p style="font-size: 0.9rem; color: #666;">英語で入力してください</p>
+            </div>
+            
+            <input type="text" id="answer-input" placeholder="答えを入力" autocomplete="off">
+            <br>
+            <button onclick="submitAnswer()" id="submit-btn">回答する</button>
+            <button onclick="nextQuestion()" id="next-btn" class="hidden">次へ</button>
+
+            <div id="feedback-area" class="hidden"></div>
+            <div class="progress">
+                残り: <span id="remaining">0</span> 問
+            </div>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="result-screen" class="hidden">
+            <h2>結果発表</h2>
+            <div class="result-score">
+                <span id="score-correct">0</span> / <span id="score-total">0</span>
+            </div>
+            <p id="result-message"></p>
+            
+            <div id="retry-actions">
+                <button onclick="startQuiz(true)" id="retry-btn">間違えた問題だけリトライ</button>
+                <button onclick="goHome()" class="secondary">やめる（ホームへ）</button>
+            </div>
+            <div id="perfect-actions" class="hidden">
+                <p>全問正解！</p>
+                <button onclick="goHome()">ホームに戻る</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // データベース (画像から転記)
+    // types: base (原形), past (過去形), pp (過去分詞), ing (-ing形)
+    // meaning: 日本語の意味
+    const verbs = [
+        // A-B-B (続き)
+        { base: "send", past: "sent", pp: "sent", ing: "sending", meaning: "送る" },
+        { base: "shoot", past: "shot", pp: "shot", ing: "shooting", meaning: "撃つ" },
+        { base: "sit", past: "sat", pp: "sat", ing: "sitting", meaning: "すわる" },
+        { base: "sleep", past: "slept", pp: "slept", ing: "sleeping", meaning: "眠る" },
+        { base: "spend", past: "spent", pp: "spent", ing: "spending", meaning: "過ごす" },
+        { base: "stand", past: "stood", pp: "stood", ing: "standing", meaning: "立つ" },
+        { base: "teach", past: "taught", pp: "taught", ing: "teaching", meaning: "教える" },
+        { base: "tell", past: "told", pp: "told", ing: "telling", meaning: "話す" },
+        { base: "think", past: "thought", pp: "thought", ing: "thinking", meaning: "考える" },
+        { base: "understand", past: "understood", pp: "understood", ing: "understanding", meaning: "理解する" },
+        { base: "win", past: "won", pp: "won", ing: "winning", meaning: "勝つ" },
+
+        // A-B-C 型
+        { base: "be", past: ["was", "were", "was / were"], pp: "been", ing: "being", meaning: "～である" },
+        { base: "begin", past: "began", pp: "begun", ing: "beginning", meaning: "始まる" },
+        { base: "bite", past: "bit", pp: "bitten", ing: "biting", meaning: "かむ" },
+        { base: "break", past: "broke", pp: "broken", ing: "breaking", meaning: "こわす" },
+        { base: "choose", past: "chose", pp: "chosen", ing: "choosing", meaning: "選ぶ" },
+        { base: "do", past: "did", pp: "done", ing: "doing", meaning: "する" },
+        { base: "draw", past: "drew", pp: "drawn", ing: "drawing", meaning: "かく(絵など)" },
+        { base: "drink", past: "drank", pp: "drunk", ing: "drinking", meaning: "飲む" },
+        { base: "drive", past: "drove", pp: "driven", ing: "driving", meaning: "運転する" },
+        { base: "eat", past: "ate", pp: "eaten", ing: "eating", meaning: "食べる" },
+        { base: "fall", past: "fell", pp: "fallen", ing: "falling", meaning: "落ちる" },
+        { base: "fly", past: "flew", pp: "flown", ing: "flying", meaning: "飛ぶ" },
+        { base: "give", past: "gave", pp: "given", ing: "giving", meaning: "与える" },
+        { base: "go", past: "went", pp: "gone", ing: "going", meaning: "行く" },
+        { base: "grow", past: "grew", pp: "grown", ing: "growing", meaning: "育つ" },
+        { base: "know", past: "knew", pp: "known", ing: "knowing", meaning: "知っている" },
+        { base: "ride", past: "rode", pp: "ridden", ing: "riding", meaning: "乗る" },
+        { base: "rise", past: "rose", pp: "risen", ing: "rising", meaning: "のぼる" },
+        { base: "see", past: "saw", pp: "seen", ing: "seeing", meaning: "見る" },
+        { base: "shake", past: "shook", pp: "shaken", ing: "shaking", meaning: "振る" },
+        { base: "show", past: "showed", pp: "shown", ing: "showing", meaning: "見せる" },
+        { base: "sing", past: "sang", pp: "sung", ing: "singing", meaning: "歌う" },
+        { base: "speak", past: "spoke", pp: "spoken", ing: "speaking", meaning: "話す" },
+        { base: "swim", past: "swam", pp: "swum", ing: "swimming", meaning: "泳ぐ" },
+        { base: "take", past: "took", pp: "taken", ing: "taking", meaning: "取る" },
+        { base: "wear", past: "wore", pp: "worn", ing: "wearing", meaning: "着ている" },
+        { base: "write", past: "wrote", pp: "written", ing: "writing", meaning: "書く" },
+
+        // A-A-A 型
+        { base: "hit", past: "hit", pp: "hit", ing: "hitting", meaning: "打つ" },
+        { base: "hurt", past: "hurt", pp: "hurt", ing: "hurting", meaning: "傷つける" },
+        { base: "put", past: "put", pp: "put", ing: "putting", meaning: "置く" },
+        { base: "quit", past: "quit", pp: "quit", ing: "quitting", meaning: "やめる" },
+        { base: "read", past: "read", pp: "read", ing: "reading", meaning: "読む" },
+        { base: "set", past: "set", pp: "set", ing: "setting", meaning: "沈む(太陽など)" },
+        { base: "spread", past: "spread", pp: "spread", ing: "spreading", meaning: "広がる" },
+
+        // A-B-A 型
+        { base: "become", past: "became", pp: "become", ing: "becoming", meaning: "なる" },
+        { base: "come", past: "came", pp: "come", ing: "coming", meaning: "来る" },
+        { base: "run", past: "ran", pp: "run", ing: "running", meaning: "走る" },
+
+        // A-B-B 型 (最初の方)
+        { base: "bring", past: "brought", pp: "brought", ing: "bringing", meaning: "持ってくる" },
+        { base: "build", past: "built", pp: "built", ing: "building", meaning: "建てる" },
+        { base: "burn", past: ["burned", "burnt"], pp: ["burned", "burnt"], ing: "burning", meaning: "燃やす" },
+        { base: "buy", past: "bought", pp: "bought", ing: "buying", meaning: "買う" },
+        { base: "catch", past: "caught", pp: "caught", ing: "catching", meaning: "つかまえる" },
+        { base: "feel", past: "felt", pp: "felt", ing: "feeling", meaning: "感じる" },
+        { base: "fight", past: "fought", pp: "fought", ing: "fighting", meaning: "たたかう" },
+        { base: "find", past: "found", pp: "found", ing: "finding", meaning: "見つける" },
+        { base: "forget", past: "forgot", pp: ["forgot", "forgotten"], ing: "forgetting", meaning: "忘れる" },
+        { base: "get", past: "got", pp: ["got", "gotten"], ing: "getting", meaning: "手に入れる" },
+        { base: "have", past: "had", pp: "had", ing: "having", meaning: "持っている" },
+        { base: "hear", past: "heard", pp: "heard", ing: "hearing", meaning: "聞く" },
+        { base: "hold", past: "held", pp: "held", ing: "holding", meaning: "持つ" },
+        { base: "keep", past: "kept", pp: "kept", ing: "keeping", meaning: "保つ" },
+        { base: "leave", past: "left", pp: "left", ing: "leaving", meaning: "去る" },
+        { base: "lose", past: "lost", pp: "lost", ing: "losing", meaning: "負ける" },
+        { base: "make", past: "made", pp: "made", ing: "making", meaning: "作る" },
+        { base: "mean", past: "meant", pp: "meant", ing: "meaning", meaning: "意味する" },
+        { base: "meet", past: "met", pp: "met", ing: "meeting", meaning: "会う" },
+        { base: "say", past: "said", pp: "said", ing: "saying", meaning: "言う" }
+    ];
+
+    // グローバル変数
+    let currentQuestions = [];
+    let wrongQuestions = [];
+    let currentIndex = 0;
+    let score = 0;
+    let isRetryMode = false;
+
+    // 初期化
+    window.onload = function() {
+        document.getElementById('max-questions').innerText = verbs.length;
+        document.getElementById('question-count').max = verbs.length;
+    };
+
+    // クイズ開始
+    function startQuiz(isRetry) {
+        isRetryMode = isRetry;
+        
+        if (isRetry) {
+            // リトライモード：間違えた問題リストを使用
+            currentQuestions = [...wrongQuestions];
+        } else {
+            // 通常モード：ランダム生成
+            const countInput = document.getElementById('question-count').value;
+            const count = Math.min(Math.max(1, countInput), verbs.length); // 範囲制限
+            
+            // 全動詞をシャッフルして必要数取得
+            const shuffledVerbs = [...verbs].sort(() => 0.5 - Math.random()).slice(0, count);
+            
+            // 各動詞について、どの形を問うかをランダム決定して問題オブジェクトを作成
+            currentQuestions = shuffledVerbs.map(v => {
+                const forms = ['base', 'past', 'pp', 'ing'];
+                const target = forms[Math.floor(Math.random() * forms.length)];
+                return {
+                    verbData: v,
+                    targetForm: target
+                };
+            });
+        }
+
+        // リセット
+        wrongQuestions = [];
+        currentIndex = 0;
+        score = 0;
+
+        // 画面切り替え
+        document.getElementById('home-screen').classList.add('hidden');
+        document.getElementById('result-screen').classList.add('hidden');
+        document.getElementById('quiz-screen').classList.remove('hidden');
+
+        showQuestion();
+    }
+
+    // 問題表示
+    function showQuestion() {
+        if (currentIndex >= currentQuestions.length) {
+            finishQuiz();
+            return;
+        }
+
+        const q = currentQuestions[currentIndex];
+        const v = q.verbData;
+        
+        let formLabel = "";
+        if (q.targetForm === 'base') formLabel = "原形";
+        else if (q.targetForm === 'past') formLabel = "過去形";
+        else if (q.targetForm === 'pp') formLabel = "過去分詞形";
+        else if (q.targetForm === 'ing') formLabel = "-ing形";
+
+        document.getElementById('q-type').innerText = formLabel;
+        document.getElementById('q-word').innerText = v.meaning + (v.base === 'be' ? ' (be)' : ''); // be動詞はヒントあり
+        
+        // UIリセット
+        document.getElementById('answer-input').value = "";
+        document.getElementById('answer-input').focus();
+        document.getElementById('feedback-area').classList.add('hidden');
+        document.getElementById('submit-btn').classList.remove('hidden');
+        document.getElementById('next-btn').classList.add('hidden');
+        
+        document.getElementById('remaining').innerText = (currentQuestions.length - currentIndex);
+    }
+
+    // 回答送信（Enterキー対応）
+    document.getElementById('answer-input').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            if (!document.getElementById('submit-btn').classList.contains('hidden')) {
+                submitAnswer();
+            } else {
+                nextQuestion();
+            }
+        }
+    });
+
+    // 答え合わせ
+    function submitAnswer() {
+        const input = document.getElementById('answer-input').value.trim().toLowerCase();
+        const q = currentQuestions[currentIndex];
+        const correctAnswer = q.verbData[q.targetForm];
+        
+        let isCorrect = false;
+
+        // 配列（複数の正解がある場合）と単一文字列の両方に対応
+        if (Array.isArray(correctAnswer)) {
+            // 入力が配列内のいずれかと一致、または "was / were" のような表記と一致するか
+            isCorrect = correctAnswer.some(ans => ans.toLowerCase() === input) || 
+                        correctAnswer.some(ans => ans.replace(/\s/g, '') === input.replace(/\s/g, ''));
+        } else {
+            isCorrect = (input === correctAnswer.toLowerCase());
+        }
+
+        const feedbackEl = document.getElementById('feedback-area');
+        feedbackEl.classList.remove('hidden');
+        feedbackEl.className = 'feedback'; // クラスリセット
+
+        if (isCorrect) {
+            score++;
+            feedbackEl.classList.add('correct');
+            feedbackEl.innerText = "正解！";
+        } else {
+            // 間違いリストに追加
+            wrongQuestions.push(q);
+            feedbackEl.classList.add('wrong');
+            const displayAns = Array.isArray(correctAnswer) ? correctAnswer.join(' / ') : correctAnswer;
+            feedbackEl.innerHTML = `残念！<br>正解は <strong>${displayAns}</strong> です。`;
+        }
+
+        document.getElementById('submit-btn').classList.add('hidden');
+        document.getElementById('next-btn').classList.remove('hidden');
+        document.getElementById('next-btn').focus();
+    }
+
+    // 次の問題へ
+    function nextQuestion() {
+        currentIndex++;
+        showQuestion();
+    }
+
+    // クイズ終了・結果表示
+    function finishQuiz() {
+        document.getElementById('quiz-screen').classList.add('hidden');
+        document.getElementById('result-screen').classList.remove('hidden');
+
+        const total = currentQuestions.length;
+        document.getElementById('score-correct').innerText = score;
+        document.getElementById('score-total').innerText = total;
+
+        const resultMsg = document.getElementById('result-message');
+        const retryArea = document.getElementById('retry-actions');
+        const perfectArea = document.getElementById('perfect-actions');
+
+        if (score === total) {
+            resultMsg.innerText = "おめでとう！全問正解！";
+            retryArea.classList.add('hidden');
+            perfectArea.classList.remove('hidden');
+        } else {
+            resultMsg.innerText = `${wrongQuestions.length}問の間違いがありました。`;
+            retryArea.classList.remove('hidden');
+            perfectArea.classList.add('hidden');
+            document.getElementById('retry-btn').innerText = `間違えた ${wrongQuestions.length}問 をリトライ`;
+        }
+    }
+
+    // ホームに戻る
+    function goHome() {
+        document.getElementById('result-screen').classList.add('hidden');
+        document.getElementById('home-screen').classList.remove('hidden');
+        // 状態リセット
+        wrongQuestions = [];
+        currentQuestions = [];
+    }
+
+</script>
+</body>
+</html>
