@@ -250,57 +250,62 @@
         { base: "say", past: "said", pp: "said", ing: "saying", meaning: "言う" }
     ];
 
-    // グローバル変数
-    let currentQuestions = [];
-    let wrongQuestions = [];
-    let currentIndex = 0;
-    let score = 0;
-    let isRetryMode = false;
 
-    // 初期化
-    window.onload = function() {
-        document.getElementById('max-questions').innerText = verbs.length;
-        document.getElementById('question-count').max = verbs.length;
-    };
+// グローバル変数
+let currentQuestions = [];
+let wrongQuestions = [];
+let currentIndex = 0;
+let score = 0;
+let isRetryMode = false;
+let askedQuestions = []; // 出題済みの問題を記録する配列
 
-    // クイズ開始
-    function startQuiz(isRetry) {
-        isRetryMode = isRetry;
+// クイズ開始
+function startQuiz(isRetry) {
+    isRetryMode = isRetry;
+    
+    if (isRetry) {
+        // リトライモード：間違えた問題リストを使用
+        currentQuestions = [...wrongQuestions];
+    } else {
+        // 通常モード：ランダム生成
+        const countInput = document.getElementById('question-count').value;
+        const count = Math.min(Math.max(1, countInput), verbs.length); // 範囲制限
         
-        if (isRetry) {
-            // リトライモード：間違えた問題リストを使用
-            currentQuestions = [...wrongQuestions];
-        } else {
-            // 通常モード：ランダム生成
-            const countInput = document.getElementById('question-count').value;
-            const count = Math.min(Math.max(1, countInput), verbs.length); // 範囲制限
-            
-            // 全動詞をシャッフルして必要数取得
-            const shuffledVerbs = [...verbs].sort(() => 0.5 - Math.random()).slice(0, count);
-            
-            // 各動詞について、どの形を問うかをランダム決定して問題オブジェクトを作成
-            currentQuestions = shuffledVerbs.map(v => {
-                const forms = ['base', 'past', 'pp', 'ing'];
-                const target = forms[Math.floor(Math.random() * forms.length)];
-                return {
-                    verbData: v,
-                    targetForm: target
-                };
-            });
+        // 全動詞をシャッフルして必要数取得
+        const shuffledVerbs = [...verbs].sort(() => 0.5 - Math.random());
+        
+        // 出題済みの問題を避けて新しい問題を選ぶ
+        currentQuestions = [];
+        for (let v of shuffledVerbs) {
+            if (currentQuestions.length < count) {
+                // すでに出題された問題を避ける
+                if (!askedQuestions.includes(v.base)) {
+                    const forms = ['base', 'past', 'pp', 'ing'];
+                    const target = forms[Math.floor(Math.random() * forms.length)];
+                    currentQuestions.push({
+                        verbData: v,
+                        targetForm: target
+                    });
+                    askedQuestions.push(v.base); // 出題済みとして記録
+                }
+            } else {
+                break; // 必要な数の問題が集まったら終了
+            }
         }
-
-        // リセット
-        wrongQuestions = [];
-        currentIndex = 0;
-        score = 0;
-
-        // 画面切り替え
-        document.getElementById('home-screen').classList.add('hidden');
-        document.getElementById('result-screen').classList.add('hidden');
-        document.getElementById('quiz-screen').classList.remove('hidden');
-
-        showQuestion();
     }
+
+    // リセット
+    wrongQuestions = [];
+    currentIndex = 0;
+    score = 0;
+
+    // 画面切り替え
+    document.getElementById('home-screen').classList.add('hidden');
+    document.getElementById('result-screen').classList.add('hidden');
+    document.getElementById('quiz-screen').classList.remove('hidden');
+
+    showQuestion();
+}
 
     // 問題表示
     function showQuestion() {
@@ -424,3 +429,4 @@
 </body>
 
 </html>
+
